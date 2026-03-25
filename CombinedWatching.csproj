@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Jellyfin.Plugin.CombinedWatching</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.CombinedWatching</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.*">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Model" Version="10.11.*">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.*">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Web\inject.html" />
+    <None Remove="Web\loader.js" />
+    <None Remove="Web\plugin.js" />
+    <None Remove="Web\plugin.css" />
+    <None Remove="Pages\configPage.html" />
+    <EmbeddedResource Include="Web\inject.html" />
+    <EmbeddedResource Include="Web\loader.js" />
+    <EmbeddedResource Include="Web\plugin.js" />
+    <EmbeddedResource Include="Web\plugin.css" />
+    <EmbeddedResource Include="Pages\configPage.html" />
+  </ItemGroup>
+
+</Project>
