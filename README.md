@@ -46,7 +46,7 @@ This plugin merges both sections into one, sorted chronologically by when you la
 ### Build from Source
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/jellyfin-plugin-combined-watching.git
+git clone https://github.com/fampla/jellyfin-plugin-combined-watching.git
 cd jellyfin-plugin-combined-watching
 dotnet build --configuration Release
 ```
@@ -106,6 +106,10 @@ If you use [Moonfin](https://github.com/Moonfin-Client/Plugin) or [Streamyfin](h
 Built with the [Jellyfin Plugin Template](https://github.com/jellyfin/jellyfin-plugin-template) and uses the [File Transformation Plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation) by IAmParadox27 for web client injection.
 
 Inspired by the community feature request: [Give the option to combine Next Up and Continue Watching](https://features.jellyfin.org/posts/1055/give-the-option-to-combine-next-up-and-continue-watching).
+
+## Disclaimer
+
+This plugin was developed with heavy assistance from [Claude](https://claude.ai) (Anthropic's AI). The architecture, code, debugging, and documentation were created in an iterative human-AI collaboration. It works on our setup but hasn't been extensively tested across different Jellyfin configurations — contributions and bug reports are welcome!
 
 ## License
 
