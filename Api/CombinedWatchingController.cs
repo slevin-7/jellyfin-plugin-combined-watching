@@ -96,11 +96,9 @@ public class CombinedWatchingController : ControllerBase
 
         var effectiveLimit = Math.Min(limit, config.MaxItems);
         var seenIds = new HashSet<Guid>();
+        var allItems = new List<BaseItem>();
 
-        // Collect items with their sort date for chronological merging
-        var itemsWithDates = new List<(BaseItem Item, DateTime SortDate)>();
-
-        // 1. Resume items — sort date is when the user last played them
+        // 1. Resume items
         try
         {
             var resumeQuery = new InternalItemsQuery(user)
@@ -127,8 +125,7 @@ public class CombinedWatchingController : ControllerBase
             {
                 if (seenIds.Add(item.Id))
                 {
-                    var date = GetSortDate(user, item);
-                    itemsWithDates.Add((item, date));
+                    allItems.Add(item);
                 }
             }
         }
@@ -137,7 +134,7 @@ public class CombinedWatchingController : ControllerBase
             _logger.LogError(ex, "CombinedWatching: Resume query failed");
         }
 
-        // 2. NextUp items — sort date is when the user last watched that series
+        // 2. NextUp items
         try
         {
             var cutoff = DateTime.UtcNow.AddDays(-config.MaxDaysForNextUp);
@@ -163,8 +160,7 @@ public class CombinedWatchingController : ControllerBase
             {
                 if (seenIds.Add(item.Id))
                 {
-                    var date = GetSortDate(user, item);
-                    itemsWithDates.Add((item, date));
+                    allItems.Add(item);
                 }
             }
         }
@@ -173,14 +169,33 @@ public class CombinedWatchingController : ControllerBase
             _logger.LogError(ex, "CombinedWatching: NextUp query failed");
         }
 
-        // 3. Sort ALL items by date descending and take limit
-        var finalItems = itemsWithDates
+        // 3. Prefetch series dates in one query (avoids N+1 per NextUp episode)
+        var seriesDates = PrefetchSeriesDates(user, allItems);
+
+        // 4. Assign sort dates
+        var itemsWithDates = allItems
+            .Select(item => (Item: item, SortDate: GetSortDate(user, item, seriesDates)))
+            .ToList();
+
+        // 5. Sort ALL items by date descending and take limit
+        var sorted = itemsWithDates
             .OrderByDescending(x => x.SortDate)
+            .ToList();
+
+        var minDateCount = sorted.Count(x => x.SortDate == DateTime.MinValue);
+        if (minDateCount > 0)
+        {
+            _logger.LogWarning("CombinedWatching: {Count} items have DateTime.MinValue sort date (will be at bottom)", minDateCount);
+        }
+
+        var finalItems = sorted
             .Take(effectiveLimit)
             .Select(x => x.Item)
             .ToArray();
 
-        _logger.LogInformation("CombinedWatching: Returning {Count} combined items", finalItems.Length);
+        var episodeCount = finalItems.OfType<Episode>().Count();
+        var movieCount = finalItems.Length - episodeCount;
+        _logger.LogInformation("CombinedWatching: Returning {Count} combined items ({MovieCount} movies/videos, {EpisodeCount} episodes)", finalItems.Length, movieCount, episodeCount);
 
         // 4. Convert to DTOs
         var dtos = _dtoService.GetBaseItemDtos(finalItems, dtoOptions, user);
@@ -213,7 +228,61 @@ public class CombinedWatchingController : ControllerBase
     /// For resume items: when the user last played them.
     /// For NextUp items: when the user last played that series.
     /// </summary>
-    private DateTime GetSortDate(User user, BaseItem item)
+    /// <summary>
+    /// Prefetches the last played date per series in a single query, so GetSortDate
+    /// doesn't need one query per NextUp episode.
+    /// </summary>
+    private Dictionary<Guid, DateTime> PrefetchSeriesDates(User user, IEnumerable<BaseItem> items)
+    {
+        var seriesIds = items
+            .OfType<Episode>()
+            .Where(e => e.Series is not null)
+            .Select(e => e.Series!.Id)
+            .Distinct()
+            .ToList();
+
+        var result = new Dictionary<Guid, DateTime>();
+
+        if (seriesIds.Count == 0)
+        {
+            return result;
+        }
+
+        // Single query: get the most recently played episode per series
+        try
+        {
+            var playedEpisodes = _libraryManager.GetItemsResult(new InternalItemsQuery(user)
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Episode },
+                IsPlayed = true,
+                OrderBy = new[] { (ItemSortBy.DatePlayed, SortOrder.Descending) },
+                Limit = seriesIds.Count * 2,
+                IsVirtualItem = false
+            });
+
+            foreach (var ep in playedEpisodes.Items.OfType<Episode>())
+            {
+                if (ep.Series is null || result.ContainsKey(ep.Series.Id))
+                {
+                    continue;
+                }
+
+                var epData = _userDataManager.GetUserData(user, ep);
+                if (epData?.LastPlayedDate is not null)
+                {
+                    result[ep.Series.Id] = epData.LastPlayedDate.Value;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "CombinedWatching: Failed to prefetch series dates");
+        }
+
+        return result;
+    }
+
+    private DateTime GetSortDate(User user, BaseItem item, Dictionary<Guid, DateTime> seriesDates)
     {
         // Try the item's own last played date first
         var userData = _userDataManager.GetUserData(user, item);
@@ -222,18 +291,26 @@ public class CombinedWatchingController : ControllerBase
             return userData.LastPlayedDate.Value;
         }
 
-        // For episodes, try the series' last played date
-        if (item is Episode episode)
+        // For episodes, use prefetched series dates
+        if (item is Episode episode && episode.Series is not null)
         {
-            var series = episode.Series;
-            if (series is not null)
+            if (seriesDates.TryGetValue(episode.Series.Id, out var seriesDate))
             {
-                var seriesData = _userDataManager.GetUserData(user, series);
-                if (seriesData?.LastPlayedDate is not null)
-                {
-                    return seriesData.LastPlayedDate.Value;
-                }
+                return seriesDate;
             }
+
+            // Fallback: series' own user data
+            var seriesData = _userDataManager.GetUserData(user, episode.Series);
+            if (seriesData?.LastPlayedDate is not null)
+            {
+                return seriesData.LastPlayedDate.Value;
+            }
+        }
+
+        // Last resort: use item's DateCreated so it doesn't get sorted to the very bottom
+        if (item.DateCreated != default)
+        {
+            return item.DateCreated;
         }
 
         return DateTime.MinValue;
