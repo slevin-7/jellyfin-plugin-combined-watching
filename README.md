@@ -2,9 +2,9 @@
 
 A lightweight Jellyfin plugin that merges **Continue Watching** and **Next Up** into a single, chronologically sorted home section.
 
-![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11.x-00A4DC?style=flat-square&logo=jellyfin)
+![Jellyfin](https://img.shields.io/badge/Jellyfin-12.x-00A4DC?style=flat-square&logo=jellyfin)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
-![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=flat-square)
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square)
 
 ## The Problem
 
@@ -28,7 +28,7 @@ This plugin merges both sections into one, sorted chronologically by when you la
 
 ## Requirements
 
-- **Jellyfin 10.11.x** (tested on 10.11.6)
+- **Jellyfin 12.x** (tested on 12.4; for 10.11 use v1.1.0)
 - **[File Transformation Plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation)** (required for web client injection)
 
 ## Installation
@@ -46,12 +46,12 @@ This plugin merges both sections into one, sorted chronologically by when you la
 ### Build from Source
 
 ```bash
-git clone https://github.com/fampla/jellyfin-plugin-combined-watching.git
+git clone https://github.com/slevin-7/jellyfin-plugin-combined-watching.git
 cd jellyfin-plugin-combined-watching
 dotnet build --configuration Release
 ```
 
-The compiled DLL will be at `bin/Release/net9.0/Jellyfin.Plugin.CombinedWatching.dll`.
+The compiled DLL will be at `bin/Release/net10.0/Jellyfin.Plugin.CombinedWatching.dll`.
 
 ## Configuration
 
