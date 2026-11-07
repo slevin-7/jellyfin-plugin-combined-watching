@@ -208,6 +208,13 @@ public class CombinedWatchingController : ControllerBase
     }
 
     /// <summary>
+    /// Empty result; the web client's NextUp XHR is redirected here (XHR can't be answered client-side like fetch).
+    /// </summary>
+    [HttpGet("Empty")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<object> GetEmpty() => new { Items = Array.Empty<object>(), TotalRecordCount = 0, StartIndex = 0 };
+
+    /// <summary>
     /// Gets the plugin configuration for the client.
     /// </summary>
     [HttpGet("Config")]
